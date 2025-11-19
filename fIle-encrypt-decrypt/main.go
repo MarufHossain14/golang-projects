@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"file-encrypt-decrypt/cryption"
 	"fmt"
 	"os"
+
+	"golang.org/x/term"
 )
 
 func main() {
@@ -47,7 +50,7 @@ func encrypthandle() {
 		os.Exit(1)
 	}
 	file := os.Args[2]
-	if !validate(file) {
+	if !validateFile(file) {
 		panic("File does not exist")
 	}
 	password := getPassword()
@@ -57,7 +60,19 @@ func encrypthandle() {
 }
 
 func decrypthandle() {
-	fmt.Println("decrypt handler not implemented")
+	if len(os.Args) < 3 {
+		fmt.Println("Please provide the path to the file to decrypt, run go run . help")
+		os.Exit(1)
+	}
+	file := os.Args[2]
+	if !validateFile(file) {
+		panic("File does not exist")
+	}
+	fmt.Print("Enter password: ")
+	password, _ := term.ReadPassword(0)
+	fmt.Println("\nDecrypting file:")
+	cryption.Decrypt(file, password)
+	fmt.Println("File decrypted successfully")
 }
 
 func getPassword() []byte {
