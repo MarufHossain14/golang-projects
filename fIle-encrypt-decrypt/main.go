@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 )
@@ -46,37 +47,42 @@ func encrypthandle() {
 		os.Exit(1)
 	}
 	file := os.Args[2]
-	if !validate(file){
+	if !validate(file) {
 		panic("File does not exist")
 	}
 	password := getPassword()
+	fmt.Println("\nEncrypting file:")
+	cryption.Encrypt(file, password)
+	fmt.Println("File encrypted successfully")
 }
 
 func decrypthandle() {
 	fmt.Println("decrypt handler not implemented")
 }
 
-func getPassword() []byte{
+func getPassword() []byte {
 	fmt.Print("Enter password: ")
 	password, _ := term.ReadPassword(0)
 	fmt.Println("\nConfirm password: ")
 	confirmPassword, _ := term.ReadPassword(0)
-	if string(password) != string(confirmPassword){
+	if string(password) != string(confirmPassword) {
 		fmt.Println("Passwords do not match")
 
 	}
 	return password
 
-
-
 }
 
-func validatePassworcd() {
+func validatePassworcd(password []byte, confirmPassword []byte) bool {
+	if !bytes.Equal(password, confirmPassword) {
+		return false
+	}
+	return true
 
 }
 
 func validateFile(file string) bool {
-	if _, err := os.Stat(file); os.IsNotExist(err){}
+	if _, err := os.Stat(file); os.IsNotExist(err) {
 		return false
 	}
 	return true
