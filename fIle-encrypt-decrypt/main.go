@@ -41,14 +41,33 @@ func printHelp() {
 }
 
 func encrypthandle() {
-	fmt.Println("encrypt handler not implemented")
+	if len(os.Args) < 3 {
+		fmt.Println("Please provide the path to the file to encrypt, run go run . help")
+		os.Exit(1)
+	}
+	file := os.Args[2]
+	if !validate(file){
+		panic("File does not exist")
+	}
+	password := getPassword()
 }
 
 func decrypthandle() {
 	fmt.Println("decrypt handler not implemented")
 }
 
-func getPassword() {
+func getPassword() []byte{
+	fmt.Print("Enter password: ")
+	password, _ := term.ReadPassword(0)
+	fmt.Println("\nConfirm password: ")
+	confirmPassword, _ := term.ReadPassword(0)
+	if string(password) != string(confirmPassword){
+		fmt.Println("Passwords do not match")
+
+	}
+	return password
+
+
 
 }
 
@@ -56,6 +75,9 @@ func validatePassworcd() {
 
 }
 
-func validateFile() {
-
+func validateFile(file string) bool {
+	if _, err := os.Stat(file); os.IsNotExist(err){}
+		return false
+	}
+	return true
 }
