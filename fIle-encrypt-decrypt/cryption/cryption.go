@@ -3,12 +3,13 @@ package cryption
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
 	"io"
 	"os"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 func Encrypt(source string, password []byte) {
@@ -35,11 +36,11 @@ func Encrypt(source string, password []byte) {
 	if err != nil {
 		panic(err.Error())
 	}
-	aesgcm, err := aes.NewGCM(block)
+	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		panic(err.Error())
 	}
-	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil )
+	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
 	ciphertext = append(ciphertext, nonce...)
 
 	dstFile, err := os.Create(source)
@@ -51,9 +52,10 @@ func Encrypt(source string, password []byte) {
 	if err != nil {
 		panic(err.Error())
 	}
+}
 
 func Decrypt(source string, password []byte) {
-	if _, err := os.Stat(source); os.IsExist(err){
+	if _, err := os.Stat(source); os.IsNotExist(err) {
 		panic(err.Error())
 	}
 	srcFile, err := os.Open(source)

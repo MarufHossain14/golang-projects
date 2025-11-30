@@ -1,0 +1,5 @@
+# To encrypt img.png:
+go run . encrypt img.png
+
+# To decrypt it back:
+go run . decrypt img.png

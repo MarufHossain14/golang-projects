@@ -2,9 +2,10 @@ package main
 
 import (
 	"bytes"
-	"file-encrypt-decrypt/cryption"
 	"fmt"
 	"os"
+
+	"github.com/MarufHossain14/golang-projects/file-encrypt-decrypt/cryption"
 
 	"golang.org/x/term"
 )
@@ -46,8 +47,8 @@ func printHelp() {
 
 func encrypthandle() {
 	if len(os.Args) < 3 {
-		fmt.Println("Please provide the path to the file to encrypt, run go run . help")
-		os.Exit(1)
+		println("Please provide the path to the file to encrypt, run go run . help")
+		os.Exit(0)
 	}
 	file := os.Args[2]
 	if !validateFile(file) {
@@ -61,7 +62,7 @@ func encrypthandle() {
 
 func decrypthandle() {
 	if len(os.Args) < 3 {
-		fmt.Println("Please provide the path to the file to decrypt, run go run . help")
+		println("Please provide the path to the file to decrypt, run go run . help")
 		os.Exit(1)
 	}
 	file := os.Args[2]
@@ -81,23 +82,23 @@ func getPassword() []byte {
 	fmt.Println("\nConfirm password: ")
 	confirmPassword, _ := term.ReadPassword(0)
 	if string(password) != string(confirmPassword) {
-		fmt.Println("Passwords do not match")
+		fmt.Print("Passwords do not match")
+		return getPassword()
 
 	}
 	return password
 
 }
 
-func validatePassworcd(password []byte, confirmPassword []byte) bool {
-	if !bytes.Equal(password, confirmPassword) {
+func validateFile(file string) bool {
+	if _, err := os.Stat(file); os.IsNotExist(err) {
 		return false
 	}
 	return true
-
 }
 
-func validateFile(file string) bool {
-	if _, err := os.Stat(file); os.IsNotExist(err) {
+func validatePassworcd(password []byte, confirmPassword []byte) bool {
+	if !bytes.Equal(password, confirmPassword) {
 		return false
 	}
 	return true
