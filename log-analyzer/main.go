@@ -1,18 +1,32 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 )
 
 func main() {
 	fptr := flag.String("fpath", "test.txt", "file path to read from")
 	flag.Parse()
-	contents, err := os.ReadFile(*fptr)
+
+	f, err := os.Open(*fptr)
 	if err != nil {
-		fmt.Println("File reading error", err)
-		return
+		log.Fatal(err)
 	}
-	fmt.Println("Contents of file: ", string(contents))
+    defer func() {
+	    if err = f.Close(); err != nil {
+		log.Fatal(err)
+	}
+	}()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		fmt.Println(s.Text())
+	}
+	err = s.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
