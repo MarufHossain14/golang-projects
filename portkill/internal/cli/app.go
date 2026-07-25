@@ -2,8 +2,11 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
+
+	"github.com/MarufHossain14/golang-projects/portkill/internal/process"
 )
 
 const (
@@ -12,11 +15,15 @@ const (
 	exitUsage   = 2
 )
 
+type processFinder interface {
+	FindByPort(port int) (process.Info, error)
+}
+
 // Run handles command-line arguments and returns a process exit code.
 //
 // Keeping this work outside main makes the CLI easy to test without starting
 // another operating-system process.
-func Run(args []string, stdout, stderr io.Writer, version string) int {
+func Run(args []string, stdout, stderr io.Writer, version string, finder processFinder) int {
 	if len(args) == 0 {
 		printHelp(stdout)
 		return exitSuccess
@@ -45,8 +52,25 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 		return exitFailure
 	}
 
-	fmt.Fprintf(stderr, "portkill: process lookup for port %d is not available yet\n", options.Port)
-	return exitFailure
+	info, err := finder.FindByPort(options.Port)
+	if errors.Is(err, process.ErrNotFound) {
+		fmt.Fprintf(stderr, "portkill: no process is listening on port %d\n", options.Port)
+		return exitFailure
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "portkill: find process: %v\n", err)
+		return exitFailure
+	}
+
+	fmt.Fprintf(stdout, "Found process using port %d\n\n", info.Port)
+	fmt.Fprintf(stdout, "Process: %s\n", info.Name)
+	fmt.Fprintf(stdout, "PID: %d\n", info.PID)
+	if info.Command != "" {
+		fmt.Fprintf(stdout, "Command: %s\n", info.Command)
+	}
+	fmt.Fprintln(stdout, "\nProcess discovery only; nothing was terminated.")
+
+	return exitSuccess
 }
 
 func printHelp(w io.Writer) {
