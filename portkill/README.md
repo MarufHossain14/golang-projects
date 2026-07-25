@@ -1,36 +1,51 @@
 # portkill
 
-`portkill` will be a small cross-platform CLI for finding and terminating the
-process listening on a network port.
+portkill is a command line project in Go. The main goal is to give it a port number like 3000 and then it will find which process is using that port and stop it.
 
-The project is being built in small, tested steps. The current milestone
-provides the project structure plus help and version commands. Port lookup and
-termination will be added in later milestones.
+right now the full project is not done yet. So far it can take the arguments
+from the user, show the help and version, and check if the port and options are
+valid.
 
-## Project structure
+when the program starts it goes to `cmd/portkill/main.go`. This gets the
+arguments from the terminal and sends them to the cli package.
 
-```text
-portkill/
-├── cmd/portkill/       # The small executable entry point
-├── internal/cli/       # Shared command-line behavior
-├── go.mod
-└── README.md
+in the cli package there is an Options struct. This is where we keep the port
+number and options like force, dry-run, list and json together. Then
+`ParseOptions` goes through the arguments one by one and fills the struct.
+
+the port has to be a number from 1 to 65535 because that is the valid range for
+network ports. It also checks things like giving two ports, using an unknown
+option, or using options together that do not make sense.
+
+for example:
+
+```bash
+go run ./cmd/portkill 3000
 ```
 
-The `internal` directory prevents these application-only packages from being
-imported by unrelated projects.
+this accepts 3000 as a valid port. It does not find the process yet because
+that will be added in the next part.
 
-## Run during development
+```bash
+go run ./cmd/portkill 70000
+```
+
+this gives an error because the port is too high.
+
+some things I learned in this part are how command line arguments work, how to
+keep values in a struct, how to convert text into a number, how to return
+errors and how to test different inputs.
+
+to see the help:
 
 ```bash
 go run ./cmd/portkill --help
-go run ./cmd/portkill version
 ```
 
-## Test
+to run the tests:
 
 ```bash
 go test ./...
 ```
 
-This milestone uses only the Go standard library.
+for now the project only uses the Go standard library.

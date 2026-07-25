@@ -37,16 +37,16 @@ func TestRunVersion(t *testing.T) {
 	}
 }
 
-func TestRunUnknownArgument(t *testing.T) {
+func TestRunAcceptsValidPort(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	exitCode := Run([]string{"3000"}, &stdout, &stderr, "dev")
 
-	if exitCode != exitUsage {
-		t.Fatalf("expected exit code %d, got %d", exitUsage, exitCode)
+	if exitCode != exitFailure {
+		t.Fatalf("expected exit code %d, got %d", exitFailure, exitCode)
 	}
-	if !strings.Contains(stderr.String(), "not available yet") {
-		t.Fatalf("expected a useful error, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "process lookup for port 3000") {
+		t.Fatalf("expected the validated port in the output, got %q", stderr.String())
 	}
 }

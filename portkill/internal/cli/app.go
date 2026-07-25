@@ -8,6 +8,7 @@ import (
 
 const (
 	exitSuccess = 0
+	exitFailure = 1
 	exitUsage   = 2
 )
 
@@ -28,11 +29,24 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 	case "version", "-v", "--version":
 		fmt.Fprintf(stdout, "portkill %s\n", version)
 		return exitSuccess
-	default:
-		fmt.Fprintf(stderr, "portkill: port operations are not available yet\n")
-		fmt.Fprintf(stderr, "Run 'portkill --help' for usage.\n")
+	}
+
+	options, err := ParseOptions(args)
+	if err != nil {
+		fmt.Fprintf(stderr, "portkill: %v\n", err)
+		fmt.Fprintln(stderr, "Run 'portkill --help' for usage.")
 		return exitUsage
 	}
+
+	// Process discovery is implemented in the next milestone. Keeping this
+	// message here lets us verify that valid options reached the right path.
+	if options.List {
+		fmt.Fprintln(stderr, "portkill: listing ports is not available yet")
+		return exitFailure
+	}
+
+	fmt.Fprintf(stderr, "portkill: process lookup for port %d is not available yet\n", options.Port)
+	return exitFailure
 }
 
 func printHelp(w io.Writer) {
