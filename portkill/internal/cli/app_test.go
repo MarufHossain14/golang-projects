@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -14,6 +15,8 @@ type stubManager struct {
 	findErr       error
 	terminateErr  error
 	terminatedPID *int
+	processes     []process.Info
+	listErr       error
 }
 
 func (s stubManager) FindByPort(int) (process.Info, error) {
@@ -25,6 +28,10 @@ func (s stubManager) Terminate(pid int) error {
 		*s.terminatedPID = pid
 	}
 	return s.terminateErr
+}
+
+func (s stubManager) List() ([]process.Info, error) {
+	return s.processes, s.listErr
 }
 
 func TestRunHelp(t *testing.T) {
@@ -93,6 +100,101 @@ func TestRunDryRun(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected no error output, got %q", stderr.String())
+	}
+}
+
+func TestRunDryRunJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	manager := stubManager{
+		info: process.Info{
+			Port:    3000,
+			PID:     12345,
+			Name:    "node",
+			Command: "pnpm dev",
+		},
+	}
+	exitCode := Run(
+		[]string{"3000", "--dry-run", "--json"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		"dev",
+		manager,
+	)
+
+	if exitCode != exitSuccess {
+		t.Fatalf("expected exit code %d, got %d", exitSuccess, exitCode)
+	}
+
+	var got process.Info
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("expected valid JSON, got %q: %v", stdout.String(), err)
+	}
+	if got != manager.info {
+		t.Fatalf("JSON process = %+v, want %+v", got, manager.info)
+	}
+	if !strings.Contains(stderr.String(), "Dry run") {
+		t.Fatalf("expected status on stderr, got %q", stderr.String())
+	}
+}
+
+func TestRunList(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	manager := stubManager{
+		processes: []process.Info{
+			{Port: 3000, PID: 12345, Name: "node", Command: "pnpm dev"},
+			{Port: 5432, PID: 9123, Name: "postgres", Command: "postgres"},
+		},
+	}
+	exitCode := Run(
+		[]string{"--list"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		"dev",
+		manager,
+	)
+
+	if exitCode != exitSuccess {
+		t.Fatalf("expected exit code %d, got %d", exitSuccess, exitCode)
+	}
+	if !strings.Contains(stdout.String(), "PORT") || !strings.Contains(stdout.String(), "pnpm dev") {
+		t.Fatalf("expected process table, got %q", stdout.String())
+	}
+}
+
+func TestRunListJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	manager := stubManager{
+		processes: []process.Info{
+			{Port: 3000, PID: 12345, Name: "node", Command: "pnpm dev"},
+		},
+	}
+	exitCode := Run(
+		[]string{"--list", "--json"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		"dev",
+		manager,
+	)
+
+	if exitCode != exitSuccess {
+		t.Fatalf("expected exit code %d, got %d", exitSuccess, exitCode)
+	}
+
+	var got []process.Info
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("expected valid JSON, got %q: %v", stdout.String(), err)
+	}
+	if len(got) != 1 || got[0] != manager.processes[0] {
+		t.Fatalf("JSON processes = %+v, want %+v", got, manager.processes)
 	}
 }
 

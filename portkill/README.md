@@ -30,6 +30,13 @@ down cleanly.
 `--dry-run` only shows what would be stopped and never sends the signal.
 `--force` skips the question and sends the signal right away.
 
+`--list` runs lsof without one specific port and shows all the listening TCP
+ports in a table. The table is made with Go's tabwriter so another package is
+not needed.
+
+`--json` uses Go's json package to print the process information in JSON. This
+is useful if the output needs to be read by a script instead of a person.
+
 for example:
 
 ```bash
@@ -42,6 +49,8 @@ is listening there. Then it asks before stopping it.
 ```bash
 go run ./cmd/portkill 3000 --dry-run
 go run ./cmd/portkill 3000 --force
+go run ./cmd/portkill --list
+go run ./cmd/portkill --list --json
 ```
 
 ```bash
@@ -53,7 +62,8 @@ this gives an error because the port is too high.
 some things I learned in this part are how command line arguments work, how to
 keep values in a struct, how to convert text into a number, how to return
 errors, how to run a Linux command from Go, how to read process information
-from `/proc`, how Linux signals work and how to test different inputs.
+from `/proc`, how Linux signals work, how to make a table and JSON output and
+how to test different inputs.
 
 to see the help:
 

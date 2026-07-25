@@ -3,10 +3,12 @@ package cli
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/MarufHossain14/golang-projects/portkill/internal/process"
 )
@@ -19,6 +21,7 @@ const (
 
 type processManager interface {
 	FindByPort(port int) (process.Info, error)
+	List() ([]process.Info, error)
 	Terminate(pid int) error
 }
 
@@ -49,8 +52,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, version strin
 	}
 
 	if options.List {
-		fmt.Fprintln(stderr, "portkill: listing ports is not available yet")
-		return exitFailure
+		return runList(stdout, stderr, manager, options.JSON)
 	}
 
 	info, err := manager.FindByPort(options.Port)
@@ -63,26 +65,29 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, version strin
 		return exitFailure
 	}
 
-	fmt.Fprintf(stdout, "Found process using port %d\n\n", info.Port)
-	fmt.Fprintf(stdout, "Process: %s\n", info.Name)
-	fmt.Fprintf(stdout, "PID: %d\n", info.PID)
-	if info.Command != "" {
-		fmt.Fprintf(stdout, "Command: %s\n", info.Command)
+	if err := writeProcess(stdout, info, options.JSON); err != nil {
+		fmt.Fprintf(stderr, "portkill: write output: %v\n", err)
+		return exitFailure
+	}
+
+	statusOutput := stdout
+	if options.JSON {
+		statusOutput = stderr
 	}
 
 	if options.DryRun {
-		fmt.Fprintln(stdout, "\nDry run: this process would be terminated.")
+		fmt.Fprintln(statusOutput, "\nDry run: this process would be terminated.")
 		return exitSuccess
 	}
 
 	if !options.Force {
-		confirmed, err := askForConfirmation(stdin, stdout)
+		confirmed, err := askForConfirmation(stdin, statusOutput)
 		if err != nil {
 			fmt.Fprintf(stderr, "portkill: confirmation: %v\n", err)
 			return exitFailure
 		}
 		if !confirmed {
-			fmt.Fprintln(stdout, "Cancelled. Process was not terminated.")
+			fmt.Fprintln(statusOutput, "Cancelled. Process was not terminated.")
 			return exitSuccess
 		}
 	}
@@ -92,9 +97,74 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, version strin
 		return exitFailure
 	}
 
-	fmt.Fprintln(stdout, "Successfully terminated process.")
+	fmt.Fprintln(statusOutput, "Successfully terminated process.")
 
 	return exitSuccess
+}
+
+func runList(stdout, stderr io.Writer, manager processManager, jsonOutput bool) int {
+	processes, err := manager.List()
+	if err != nil {
+		fmt.Fprintf(stderr, "portkill: list processes: %v\n", err)
+		return exitFailure
+	}
+
+	if jsonOutput {
+		if processes == nil {
+			processes = []process.Info{}
+		}
+		if err := json.NewEncoder(stdout).Encode(processes); err != nil {
+			fmt.Fprintf(stderr, "portkill: write JSON: %v\n", err)
+			return exitFailure
+		}
+		return exitSuccess
+	}
+
+	if len(processes) == 0 {
+		fmt.Fprintln(stdout, "No listening TCP ports found.")
+		return exitSuccess
+	}
+
+	writer := tabwriter.NewWriter(stdout, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(writer, "PORT\tPID\tPROCESS\tCOMMAND")
+	for _, info := range processes {
+		name := info.Name
+		if name == "" {
+			name = "-"
+		}
+		command := info.Command
+		if command == "" {
+			command = "-"
+		}
+		fmt.Fprintf(
+			writer,
+			"%d\t%d\t%s\t%s\n",
+			info.Port,
+			info.PID,
+			name,
+			strings.ReplaceAll(command, "\t", " "),
+		)
+	}
+	if err := writer.Flush(); err != nil {
+		fmt.Fprintf(stderr, "portkill: write table: %v\n", err)
+		return exitFailure
+	}
+
+	return exitSuccess
+}
+
+func writeProcess(output io.Writer, info process.Info, jsonOutput bool) error {
+	if jsonOutput {
+		return json.NewEncoder(output).Encode(info)
+	}
+
+	fmt.Fprintf(output, "Found process using port %d\n\n", info.Port)
+	fmt.Fprintf(output, "Process: %s\n", info.Name)
+	fmt.Fprintf(output, "PID: %d\n", info.PID)
+	if info.Command != "" {
+		fmt.Fprintf(output, "Command: %s\n", info.Command)
+	}
+	return nil
 }
 
 func askForConfirmation(input io.Reader, output io.Writer) (bool, error) {
