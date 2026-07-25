@@ -2,26 +2,24 @@
 
 portkill is a command line project in Go. The main goal is to give it a port number like 3000 and then it will find which process is using that port and stop it.
 
-right now the full project is not done yet. So far it can take the arguments
-from the user, check if the port and options are valid and find the process
-listening on a TCP port. It shows the process and asks the user before stopping
-it.
+the project takes the arguments from the user, checks if the port and options
+are valid and finds the process listening on a TCP port. It shows the process
+and asks the user before stopping it.
 
-when the program starts it goes to `cmd/portkill/main.go`. This gets the
-arguments from the terminal and sends them to the cli package.
+when the program starts it goes to `main.go`. This gets the arguments from the
+terminal, checks the options and prints the result.
 
-in the cli package there is an Options struct. This is where we keep the port
-number and options like force, dry-run, list and json together. Then
-`ParseOptions` goes through the arguments one by one and fills the struct.
+the Linux process code is in `process.go`. It finds the PID, reads the process
+information and sends the signal to stop it.
 
 the port has to be a number from 1 to 65535 because that is the valid range for
 network ports. It also checks things like giving two ports, using an unknown
 option, or using options together that do not make sense.
 
-to find the process on Linux it uses a command called `lsof`. The `-iTCP` part
-looks at TCP ports and `-sTCP:LISTEN` only looks for processes that are waiting
-for connections. After getting the PID and process name, it reads
-`/proc/<pid>/cmdline` to get the full command if it is available.
+to find the process on Linux it uses a command called `ss`. This shows the TCP
+ports that are waiting for connections and the PID using each port. After
+getting the PID, it reads `/proc/<pid>/cmdline` to get the full command if it
+is available.
 
 after showing the process it asks `Kill this process? (Y/n)`. If the answer is
 yes, Go sends a SIGTERM signal to the PID. SIGTERM asks the process to shut
@@ -30,7 +28,7 @@ down cleanly.
 `--dry-run` only shows what would be stopped and never sends the signal.
 `--force` skips the question and sends the signal right away.
 
-`--list` runs lsof without one specific port and shows all the listening TCP
+`--list` runs ss without one specific port and shows all the listening TCP
 ports in a table. The table is made with Go's tabwriter so another package is
 not needed.
 
@@ -40,21 +38,21 @@ is useful if the output needs to be read by a script instead of a person.
 for example:
 
 ```bash
-go run ./cmd/portkill 3000
+go run . 3000
 ```
 
 this checks port 3000 and shows the process name, PID and command if something
 is listening there. Then it asks before stopping it.
 
 ```bash
-go run ./cmd/portkill 3000 --dry-run
-go run ./cmd/portkill 3000 --force
-go run ./cmd/portkill --list
-go run ./cmd/portkill --list --json
+go run . 3000 --dry-run
+go run . 3000 --force
+go run . --list
+go run . --list --json
 ```
 
 ```bash
-go run ./cmd/portkill 70000
+go run . 70000
 ```
 
 this gives an error because the port is too high.
@@ -68,7 +66,38 @@ how to test different inputs.
 to see the help:
 
 ```bash
-go run ./cmd/portkill --help
+go run . --help
+```
+
+to use the project on ubuntu or WSL it needs Go and the `ss` command. ss is
+usually already installed, but it can be installed with:
+
+```bash
+sudo apt update
+sudo apt install iproute2
+```
+
+after downloading the project, go into the portkill folder and install it:
+
+```bash
+go install .
+```
+
+the Go bin folder has to be in PATH so the command can be used from any folder:
+
+```bash
+export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
+```
+
+then it can be used like this:
+
+```bash
+portkill 3000
+portkill 3000 --dry-run
+portkill 3000 --force
+portkill --list
+portkill --list --json
+portkill --version
 ```
 
 to run the tests:
@@ -77,4 +106,4 @@ to run the tests:
 go test ./...
 ```
 
-for now the project only uses the Go standard library.
+the project only uses the Go standard library.

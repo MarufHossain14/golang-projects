@@ -1,0 +1,170 @@
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"sort"
+	"strconv"
+	"strings"
+	"syscall"
+)
+
+var errNotFound = errors.New("no listening process found")
+
+// Process contains the information shown to the user.
+type Process struct {
+	Port    int    `json:"port"`
+	PID     int    `json:"pid"`
+	Name    string `json:"process"`
+	Command string `json:"command"`
+}
+
+// findProcess asks ss for the PID listening on one TCP port.
+func findProcess(port int) (Process, error) {
+	output, err := exec.Command(
+		"ss", "-H", "-ltnp",
+		fmt.Sprintf("sport = :%d", port),
+	).Output()
+	if err != nil {
+		return Process{}, handleSSError(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) == 0 || lines[0] == "" {
+		return Process{}, errNotFound
+	}
+	found, err := parseSSLine(lines[0])
+	if err != nil {
+		return Process{}, err
+	}
+
+	info := processInfo(found.PID, found.Port)
+	if info.Name == "" {
+		info.Name = found.Name
+	}
+	return info, nil
+}
+
+// listProcesses asks ss for every listening TCP port.
+func listProcesses() ([]Process, error) {
+	output, err := exec.Command("ss", "-H", "-ltnp").Output()
+	if err != nil {
+		return nil, handleSSError(err)
+	}
+
+	processes := parseSSList(output)
+	commands := make(map[int]string)
+	for i := range processes {
+		command, ok := commands[processes[i].PID]
+		if !ok {
+			command = readCommand(processes[i].PID)
+			commands[processes[i].PID] = command
+		}
+		processes[i].Command = command
+	}
+	return processes, nil
+}
+
+// parseSSList converts ss output into Process values.
+func parseSSList(output []byte) []Process {
+	var processes []Process
+	seen := make(map[[2]int]bool)
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+
+	for scanner.Scan() {
+		process, err := parseSSLine(scanner.Text())
+		key := [2]int{process.PID, process.Port}
+		if err != nil || seen[key] {
+			continue
+		}
+		// The same socket can appear for IPv4 and IPv6, so only keep it once.
+		seen[key] = true
+		processes = append(processes, process)
+	}
+
+	sort.Slice(processes, func(i, j int) bool {
+		return processes[i].Port < processes[j].Port
+	})
+	return processes
+}
+
+func parseSSLine(line string) (Process, error) {
+	fields := strings.Fields(line)
+	if len(fields) < 5 {
+		return Process{}, fmt.Errorf("could not read ss output")
+	}
+
+	port, err := portFromAddress(fields[3])
+	if err != nil {
+		return Process{}, err
+	}
+
+	pidStart := strings.Index(line, "pid=")
+	if pidStart == -1 {
+		return Process{}, fmt.Errorf("PID is not available")
+	}
+	pidText := line[pidStart+4:]
+	pidEnd := strings.IndexFunc(pidText, func(r rune) bool {
+		return r < '0' || r > '9'
+	})
+	if pidEnd != -1 {
+		pidText = pidText[:pidEnd]
+	}
+	pid, err := strconv.Atoi(pidText)
+	if err != nil {
+		return Process{}, fmt.Errorf("could not read PID from ss")
+	}
+
+	name := ""
+	nameStart := strings.Index(line, `(("`)
+	nameEnd := strings.Index(line, `",pid=`)
+	if nameStart != -1 && nameEnd > nameStart {
+		name = line[nameStart+3 : nameEnd]
+	}
+
+	return Process{Port: port, PID: pid, Name: name}, nil
+}
+
+func portFromAddress(address string) (int, error) {
+	colon := strings.LastIndex(address, ":")
+	if colon == -1 {
+		return 0, fmt.Errorf("port not found")
+	}
+	return strconv.Atoi(address[colon+1:])
+}
+
+// processInfo reads Linux's /proc folder for the name and full command.
+func processInfo(pid, port int) Process {
+	name, _ := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
+	return Process{
+		Port:    port,
+		PID:     pid,
+		Name:    strings.TrimSpace(string(name)),
+		Command: readCommand(pid),
+	}
+}
+
+func readCommand(pid int) string {
+	command, _ := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+	// Linux separates command arguments with null bytes instead of spaces.
+	return strings.TrimSpace(string(bytes.ReplaceAll(command, []byte{0}, []byte(" "))))
+}
+
+// terminateProcess sends SIGTERM so the process can shut down cleanly.
+func terminateProcess(pid int) error {
+	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("could not terminate PID %d: %w", pid, err)
+	}
+	return nil
+}
+
+func handleSSError(err error) error {
+	if errors.Is(err, exec.ErrNotFound) {
+		return fmt.Errorf("ss is required; install it with 'sudo apt install iproute2'")
+	}
+	return fmt.Errorf("ss failed: %w", err)
+}
