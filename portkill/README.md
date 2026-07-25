@@ -4,8 +4,8 @@ portkill is a command line project in Go. The main goal is to give it a port num
 
 right now the full project is not done yet. So far it can take the arguments
 from the user, check if the port and options are valid and find the process
-listening on a TCP port. It only shows the process for now and does not stop
-anything yet.
+listening on a TCP port. It shows the process and asks the user before stopping
+it.
 
 when the program starts it goes to `cmd/portkill/main.go`. This gets the
 arguments from the terminal and sends them to the cli package.
@@ -23,6 +23,13 @@ looks at TCP ports and `-sTCP:LISTEN` only looks for processes that are waiting
 for connections. After getting the PID and process name, it reads
 `/proc/<pid>/cmdline` to get the full command if it is available.
 
+after showing the process it asks `Kill this process? (Y/n)`. If the answer is
+yes, Go sends a SIGTERM signal to the PID. SIGTERM asks the process to shut
+down cleanly.
+
+`--dry-run` only shows what would be stopped and never sends the signal.
+`--force` skips the question and sends the signal right away.
+
 for example:
 
 ```bash
@@ -30,7 +37,12 @@ go run ./cmd/portkill 3000
 ```
 
 this checks port 3000 and shows the process name, PID and command if something
-is listening there.
+is listening there. Then it asks before stopping it.
+
+```bash
+go run ./cmd/portkill 3000 --dry-run
+go run ./cmd/portkill 3000 --force
+```
 
 ```bash
 go run ./cmd/portkill 70000
@@ -41,7 +53,7 @@ this gives an error because the port is too high.
 some things I learned in this part are how command line arguments work, how to
 keep values in a struct, how to convert text into a number, how to return
 errors, how to run a Linux command from Go, how to read process information
-from `/proc` and how to test different inputs.
+from `/proc`, how Linux signals work and how to test different inputs.
 
 to see the help:
 

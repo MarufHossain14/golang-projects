@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 // ErrNotFound means that no process is listening on the requested port.
@@ -23,25 +24,33 @@ type Info struct {
 	Command string
 }
 
-// Finder uses Linux tools and the /proc filesystem to find processes.
-type Finder struct {
+// Manager finds and terminates Linux processes.
+type Manager struct {
 	run      func(name string, args ...string) ([]byte, error)
 	readFile func(name string) ([]byte, error)
+	signal   func(pid int, signal os.Signal) error
 }
 
-// NewFinder creates a Finder that uses the real operating system.
-func NewFinder() *Finder {
-	return &Finder{
+// NewManager creates a Manager that uses the real operating system.
+func NewManager() *Manager {
+	return &Manager{
 		run: func(name string, args ...string) ([]byte, error) {
 			return exec.Command(name, args...).Output()
 		},
 		readFile: os.ReadFile,
+		signal: func(pid int, signal os.Signal) error {
+			target, err := os.FindProcess(pid)
+			if err != nil {
+				return err
+			}
+			return target.Signal(signal)
+		},
 	}
 }
 
 // FindByPort finds the process listening on a TCP port.
-func (f *Finder) FindByPort(port int) (Info, error) {
-	output, err := f.run(
+func (m *Manager) FindByPort(port int) (Info, error) {
+	output, err := m.run(
 		"lsof",
 		"-nP",
 		"-a",
@@ -67,12 +76,25 @@ func (f *Finder) FindByPort(port int) (Info, error) {
 		return Info{}, err
 	}
 
-	commandLine, err := f.readFile(fmt.Sprintf("/proc/%d/cmdline", info.PID))
+	commandLine, err := m.readFile(fmt.Sprintf("/proc/%d/cmdline", info.PID))
 	if err == nil {
 		info.Command = parseCommandLine(commandLine)
 	}
 
 	return info, nil
+}
+
+// Terminate asks a process to exit cleanly using the Linux SIGTERM signal.
+func (m *Manager) Terminate(pid int) error {
+	if pid < 1 {
+		return fmt.Errorf("PID must be greater than zero")
+	}
+
+	if err := m.signal(pid, syscall.SIGTERM); err != nil {
+		return fmt.Errorf("signal PID %d: %w", pid, err)
+	}
+
+	return nil
 }
 
 func parseLsofOutput(output []byte, port int) (Info, error) {

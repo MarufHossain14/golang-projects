@@ -12,7 +12,7 @@ import (
 var version = "dev"
 
 func main() {
-	finder := process.NewFinder()
-	exitCode := cli.Run(os.Args[1:], os.Stdout, os.Stderr, version, finder)
+	manager := process.NewManager()
+	exitCode := cli.Run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr, version, manager)
 	os.Exit(exitCode)
 }
