@@ -57,7 +57,10 @@ func run(args []string) int {
 			return 1
 		}
 		if opts.json {
-			json.NewEncoder(os.Stdout).Encode(processes)
+			if err := json.NewEncoder(os.Stdout).Encode(processes); err != nil {
+				fmt.Fprintf(os.Stderr, "portkill: failed to write JSON output: %v\n", err)
+				return 1
+			}
 		} else {
 			printTable(processes)
 		}
@@ -75,7 +78,10 @@ func run(args []string) int {
 	}
 
 	if opts.json {
-		json.NewEncoder(os.Stdout).Encode(process)
+		if err := json.NewEncoder(os.Stdout).Encode(process); err != nil {
+			fmt.Fprintf(os.Stderr, "portkill: failed to write JSON output: %v\n", err)
+			return 1
+		}
 	} else {
 		fmt.Printf("✓ Found process using port %d\n\n", process.Port)
 		fmt.Printf("Process: %s\nPID: %d\nCommand: %s\n", process.Name, process.PID, process.Command)
@@ -108,13 +114,13 @@ func parseOptions(args []string) (options, error) {
 
 	for _, arg := range args {
 		switch arg {
-		case "--force":
+		case "-f", "--force":
 			opts.force = true
-		case "--dry-run":
+		case "-d", "--dry-run":
 			opts.dryRun = true
-		case "--list":
+		case "-l", "--list":
 			opts.list = true
-		case "--json":
+		case "-j", "--json":
 			opts.json = true
 		default:
 			if strings.HasPrefix(arg, "-") {
@@ -184,7 +190,20 @@ func printHelp() {
 	fmt.Println(`portkill finds and terminates the process using a TCP port.
 
 Usage:
-  portkill <port> [--force | --dry-run] [--json]
+  portkill <port> [options]
   portkill --list [--json]
-  portkill --version`)
+
+Options:
+  -f, --force     Skip confirmation
+  -d, --dry-run   Show the process without terminating it
+  -l, --list      List listening TCP ports
+  -j, --json      Print JSON output
+  -h, --help      Show this help
+  -v, --version   Show the version
+
+Examples:
+  portkill 3000
+  portkill 3000 --dry-run
+  portkill 3000 --force
+  portkill --list`)
 }

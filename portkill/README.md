@@ -97,8 +97,22 @@ portkill 3000 --dry-run
 portkill 3000 --force
 portkill --list
 portkill --list --json
+portkill --help
 portkill --version
 ```
+
+there are also shorter versions of the options:
+
+```bash
+portkill 3000 -d       # dry run
+portkill 3000 -f       # force
+portkill -l            # list
+portkill -l -j         # list as json
+```
+
+if the commands are forgotten, `portkill --help` shows them again. While the
+program is asking for confirmation, `y` means yes, `n` means no and Ctrl+C
+cancels the command.
 
 to run the tests:
 

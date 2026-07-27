@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestParseOptions(t *testing.T) {
-	options, err := parseOptions([]string{"3000", "--dry-run"})
+	options, err := parseOptions([]string{"3000", "-d"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
