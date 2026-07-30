@@ -97,6 +97,8 @@ portkill 3000 --dry-run
 portkill 3000 --force
 portkill --list
 portkill --list --json
+portkill list
+portkill list --json
 portkill --help
 portkill --version
 ```

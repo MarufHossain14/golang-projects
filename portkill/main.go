@@ -118,7 +118,7 @@ func parseOptions(args []string) (options, error) {
 			opts.force = true
 		case "-d", "--dry-run":
 			opts.dryRun = true
-		case "-l", "--list":
+		case "list", "-l", "--list":
 			opts.list = true
 		case "-j", "--json":
 			opts.json = true
@@ -192,6 +192,7 @@ func printHelp() {
 Usage:
   portkill <port> [options]
   portkill --list [--json]
+  portkill list [--json]
 
 Options:
   -f, --force     Skip confirmation
@@ -205,5 +206,6 @@ Examples:
   portkill 3000
   portkill 3000 --dry-run
   portkill 3000 --force
-  portkill --list`)
+  portkill --list
+  portkill list --json`)
 }

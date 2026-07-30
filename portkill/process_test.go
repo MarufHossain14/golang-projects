@@ -16,6 +16,16 @@ func TestParseOptions(t *testing.T) {
 	}
 }
 
+func TestParseOptionsListCommand(t *testing.T) {
+	options, err := parseOptions([]string{"list", "--json"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !options.list || !options.json {
+		t.Fatalf("unexpected options: %+v", options)
+	}
+}
+
 func TestParseSSList(t *testing.T) {
 	output := []byte(
 		"LISTEN 0 511 *:3000 *:* users:((\"node\",pid=12345,fd=20))\n" +
