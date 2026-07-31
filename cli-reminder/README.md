@@ -37,12 +37,20 @@ go build -o reminder main.go
 
 ## Usage
 
-Run the program with a time and your message:
+Run the program with a time and your message. On Windows:
+
 ```bash
 reminder.exe <hh:mm> <message>
 ```
 
-Example:
+On Linux or macOS, use the binary built in the previous section:
+
+```bash
+./reminder <hh:mm> <message>
+```
+
+Windows example:
+
 ```bash
 reminder.exe 18:50 "Meeting with team"
 reminder.exe 09:00 "Don't forget to call"
