@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -96,15 +97,19 @@ func run(args []string) int {
 		fmt.Fprintln(status, "Dry run: this process would be terminated.")
 		return 0
 	}
-	if !opts.force && !confirm(status) {
+	if !opts.force && !confirm(os.Stdin, status) {
 		fmt.Fprintln(status, "Cancelled. Process was not terminated.")
 		return 0
+	}
+	if err := verifyProcess(process.Port, process.PID); err != nil {
+		fmt.Fprintf(os.Stderr, "portkill: %v\n", err)
+		return 1
 	}
 	if err := terminateProcess(process.PID); err != nil {
 		fmt.Fprintf(os.Stderr, "portkill: %v\n", err)
 		return 1
 	}
-	fmt.Fprintln(status, "✓ Successfully terminated process.")
+	fmt.Fprintln(status, "✓ Sent SIGTERM to process.")
 	return 0
 }
 
@@ -149,22 +154,25 @@ func parseOptions(args []string) (options, error) {
 	if opts.force && opts.dryRun {
 		return opts, fmt.Errorf("--force and --dry-run cannot be used together")
 	}
+	if opts.json && !opts.list && !opts.force && !opts.dryRun {
+		return opts, fmt.Errorf("--json with a port requires --force or --dry-run")
+	}
 	return opts, nil
 }
 
-// confirm uses yes as the default when the user only presses Enter.
-func confirm(output *os.File) bool {
-	reader := bufio.NewReader(os.Stdin)
+// confirm requires an explicit yes so an accidental Enter cannot kill a process.
+func confirm(input io.Reader, output io.Writer) bool {
+	reader := bufio.NewReader(input)
 	for {
-		fmt.Fprint(output, "\nKill this process? (Y/n) ")
+		fmt.Fprint(output, "\nKill this process? (y/N) ")
 		answer, err := reader.ReadString('\n')
 		if err != nil && answer == "" {
 			return false
 		}
 		switch strings.ToLower(strings.TrimSpace(answer)) {
-		case "", "y", "yes":
+		case "y", "yes":
 			return true
-		case "n", "no":
+		case "", "n", "no":
 			return false
 		default:
 			fmt.Fprintln(output, "Please answer y or n.")

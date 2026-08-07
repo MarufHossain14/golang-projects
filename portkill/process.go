@@ -154,9 +154,31 @@ func readCommand(pid int) string {
 	return strings.TrimSpace(string(bytes.ReplaceAll(command, []byte{0}, []byte(" "))))
 }
 
+// verifyProcess makes sure the PID found before confirmation still owns the port.
+// This avoids signalling a different process if the original listener exited.
+func verifyProcess(port, pid int) error {
+	current, err := findProcess(port)
+	if errors.Is(err, errNotFound) {
+		return fmt.Errorf("nothing is listening on port %d anymore", port)
+	}
+	if err != nil {
+		return fmt.Errorf("could not verify port %d before terminating: %w", port, err)
+	}
+	if current.PID != pid {
+		return fmt.Errorf("port %d now belongs to PID %d; refusing to terminate it", port, current.PID)
+	}
+	return nil
+}
+
 // terminateProcess sends SIGTERM so the process can shut down cleanly.
 func terminateProcess(pid int) error {
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+		if errors.Is(err, syscall.ESRCH) {
+			return fmt.Errorf("PID %d exited before it could be terminated", pid)
+		}
+		if errors.Is(err, syscall.EPERM) {
+			return fmt.Errorf("permission denied terminating PID %d (try running with sudo)", pid)
+		}
 		return fmt.Errorf("could not terminate PID %d: %w", pid, err)
 	}
 	return nil

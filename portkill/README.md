@@ -4,7 +4,7 @@ portkill is a command line project in Go. The main goal is to give it a port num
 
 the project takes the arguments from the user, checks if the port and options
 are valid and finds the process listening on a TCP port. It shows the process
-and asks the user before stopping it.
+and asks the user before stopping it. Pressing Enter defaults to no.
 
 when the program starts it goes to `main.go`. This gets the arguments from the
 terminal, checks the options and prints the result.
@@ -21,9 +21,10 @@ ports that are waiting for connections and the PID using each port. After
 getting the PID, it reads `/proc/<pid>/cmdline` to get the full command if it
 is available.
 
-after showing the process it asks `Kill this process? (Y/n)`. If the answer is
-yes, Go sends a SIGTERM signal to the PID. SIGTERM asks the process to shut
-down cleanly.
+after showing the process it asks `Kill this process? (y/N)`. It only continues
+after an explicit `y` or `yes`. Before sending the signal, portkill checks that
+the same PID still owns the port. Go then sends SIGTERM, which asks the process
+to shut down cleanly.
 
 `--dry-run` only shows what would be stopped and never sends the signal.
 `--force` skips the question and sends the signal right away.
@@ -33,7 +34,9 @@ ports in a table. The table is made with Go's tabwriter so another package is
 not needed.
 
 `--json` uses Go's json package to print the process information in JSON. This
-is useful if the output needs to be read by a script instead of a person.
+is useful if the output needs to be read by a script instead of a person. With
+a port, JSON output requires `--dry-run` or `--force`, so scripts never receive
+an interactive prompt mixed with machine-readable output.
 
 for example:
 
@@ -113,8 +116,8 @@ portkill -l -j         # list as json
 ```
 
 if the commands are forgotten, `portkill --help` shows them again. While the
-program is asking for confirmation, `y` means yes, `n` means no and Ctrl+C
-cancels the command.
+program is asking for confirmation, `y` means yes, `n` or Enter means no and
+Ctrl+C cancels the command.
 
 to run the tests:
 
