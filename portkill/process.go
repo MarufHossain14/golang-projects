@@ -87,6 +87,9 @@ func parseSSList(output []byte) []Process {
 	}
 
 	sort.Slice(processes, func(i, j int) bool {
+		if processes[i].Port == processes[j].Port {
+			return processes[i].PID < processes[j].PID
+		}
 		return processes[i].Port < processes[j].Port
 	})
 	return processes

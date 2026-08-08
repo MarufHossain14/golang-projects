@@ -101,6 +101,21 @@ func TestParseSSListDeduplicatesIPv4AndIPv6(t *testing.T) {
 	}
 }
 
+func TestParseSSListSortsMatchingPortsByPID(t *testing.T) {
+	output := []byte(
+		"LISTEN 0 511 *:3000 *:* users:((\"worker-b\",pid=200,fd=20))\n" +
+			"LISTEN 0 511 *:3000 *:* users:((\"worker-a\",pid=100,fd=21))\n",
+	)
+
+	processes := parseSSList(output)
+	if len(processes) != 2 {
+		t.Fatalf("got %d processes, want 2", len(processes))
+	}
+	if processes[0].PID != 100 || processes[1].PID != 200 {
+		t.Fatalf("processes are not sorted by PID: %+v", processes)
+	}
+}
+
 func TestParseSSLineWithoutPID(t *testing.T) {
 	_, err := parseSSLine("LISTEN 0 511 *:3000 *:*")
 	if err == nil {
