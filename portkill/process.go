@@ -71,7 +71,7 @@ func listProcesses() ([]Process, error) {
 
 // parseSSList converts ss output into Process values.
 func parseSSList(output []byte) []Process {
-	var processes []Process
+	processes := make([]Process, 0)
 	seen := make(map[[2]int]bool)
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 

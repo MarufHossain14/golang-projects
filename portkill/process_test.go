@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -98,6 +99,18 @@ func TestParseSSListDeduplicatesIPv4AndIPv6(t *testing.T) {
 	processes := parseSSList(output)
 	if len(processes) != 1 {
 		t.Fatalf("got %d processes, want 1", len(processes))
+	}
+}
+
+func TestParseSSListReturnsEmptyJSONArray(t *testing.T) {
+	processes := parseSSList(nil)
+
+	output, err := json.Marshal(processes)
+	if err != nil {
+		t.Fatalf("marshal empty process list: %v", err)
+	}
+	if string(output) != "[]" {
+		t.Fatalf("empty process list JSON = %s, want []", output)
 	}
 }
 
