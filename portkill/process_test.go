@@ -1,40 +1,23 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
-	"encoding/json"
 	"strings"
 	"testing"
 )
 
 func TestParseOptions(t *testing.T) {
-	options, err := parseOptions([]string{"3000", "-d"})
+	options, err := parseOptions([]string{"3000", "--force"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if options.port != 3000 || !options.dryRun {
+	if options.port != 3000 || !options.force {
 		t.Fatalf("unexpected options: %+v", options)
 	}
 
 	if _, err := parseOptions([]string{"70000"}); err == nil {
 		t.Fatal("expected an invalid port error")
-	}
-}
-
-func TestParseOptionsListCommand(t *testing.T) {
-	options, err := parseOptions([]string{"list", "--json"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !options.list || !options.json {
-		t.Fatalf("unexpected options: %+v", options)
-	}
-}
-
-func TestParseOptionsRejectsUnsafeJSONPrompt(t *testing.T) {
-	_, err := parseOptions([]string{"3000", "--json"})
-	if err == nil {
-		t.Fatal("expected --json without --force or --dry-run to fail")
 	}
 }
 
@@ -72,60 +55,47 @@ func TestConfirmRetriesInvalidAnswer(t *testing.T) {
 	}
 }
 
-func TestParseSSList(t *testing.T) {
-	output := []byte(
-		"LISTEN 0 511 *:3000 *:* users:((\"node\",pid=12345,fd=20))\n" +
-			"LISTEN 0 244 127.0.0.1:5432 0.0.0.0:* users:((\"postgres\",pid=9123,fd=5))\n",
-	)
-
-	processes := parseSSList(output)
-	if len(processes) != 2 {
-		t.Fatalf("got %d processes, want 2", len(processes))
+func TestChooseProcess(t *testing.T) {
+	processes := []Process{
+		{Port: 3000, PID: 8014, Name: "python3"},
+		{Port: 8080, PID: 9000, Name: "server"},
 	}
-	if processes[0].Port != 3000 || processes[0].PID != 12345 {
-		t.Fatalf("unexpected first process: %+v", processes[0])
-	}
-	if processes[1].Port != 5432 || processes[1].Name != "postgres" {
-		t.Fatalf("unexpected second process: %+v", processes[1])
-	}
-}
+	var output bytes.Buffer
 
-func TestParseSSListDeduplicatesIPv4AndIPv6(t *testing.T) {
-	output := []byte(
-		"LISTEN 0 511 0.0.0.0:3000 0.0.0.0:* users:((\"node\",pid=12345,fd=20))\n" +
-			"LISTEN 0 511 [::]:3000 [::]:* users:((\"node\",pid=12345,fd=21))\n",
-	)
-
-	processes := parseSSList(output)
-	if len(processes) != 1 {
-		t.Fatalf("got %d processes, want 1", len(processes))
+	process, ok := chooseProcess(processes, strings.NewReader("wrong\n2\n"), &output)
+	if !ok {
+		t.Fatal("expected a process to be selected")
+	}
+	if process.Port != 8080 || process.PID != 9000 {
+		t.Fatalf("unexpected process: %+v", process)
+	}
+	if !strings.Contains(output.String(), "Please enter a number from the list.") {
+		t.Fatalf("expected invalid selection message, got %q", output.String())
 	}
 }
 
-func TestParseSSListReturnsEmptyJSONArray(t *testing.T) {
-	processes := parseSSList(nil)
+func TestChooseThenConfirmUsesSameInput(t *testing.T) {
+	input := bufio.NewReader(strings.NewReader("1\ny\n"))
+	var output bytes.Buffer
+	processes := []Process{{Port: 3000, PID: 8014, Name: "python3"}}
 
-	output, err := json.Marshal(processes)
+	if _, ok := chooseProcess(processes, input, &output); !ok {
+		t.Fatal("expected a process to be selected")
+	}
+	if !confirm(input, &output) {
+		t.Fatal("expected confirmation after selection")
+	}
+}
+
+func TestParseSSLine(t *testing.T) {
+	process, err := parseSSLine(
+		`LISTEN 0 511 *:3000 *:* users:(("node",pid=12345,fd=20))`,
+	)
 	if err != nil {
-		t.Fatalf("marshal empty process list: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if string(output) != "[]" {
-		t.Fatalf("empty process list JSON = %s, want []", output)
-	}
-}
-
-func TestParseSSListSortsMatchingPortsByPID(t *testing.T) {
-	output := []byte(
-		"LISTEN 0 511 *:3000 *:* users:((\"worker-b\",pid=200,fd=20))\n" +
-			"LISTEN 0 511 *:3000 *:* users:((\"worker-a\",pid=100,fd=21))\n",
-	)
-
-	processes := parseSSList(output)
-	if len(processes) != 2 {
-		t.Fatalf("got %d processes, want 2", len(processes))
-	}
-	if processes[0].PID != 100 || processes[1].PID != 200 {
-		t.Fatalf("processes are not sorted by PID: %+v", processes)
+	if process.Port != 3000 || process.PID != 12345 || process.Name != "node" {
+		t.Fatalf("unexpected process: %+v", process)
 	}
 }
 
@@ -133,5 +103,21 @@ func TestParseSSLineWithoutPID(t *testing.T) {
 	_, err := parseSSLine("LISTEN 0 511 *:3000 *:*")
 	if err == nil {
 		t.Fatal("expected missing PID to fail")
+	}
+}
+
+func TestParseSSProcesses(t *testing.T) {
+	output := []byte(
+		"LISTEN 0 5 0.0.0.0:3000 0.0.0.0:* users:((\"python3\",pid=8014,fd=3))\n" +
+			"LISTEN 0 5 [::]:3000 [::]:* users:((\"python3\",pid=8014,fd=4))\n" +
+			"LISTEN 0 1000 10.255.255.254:53 0.0.0.0:*\n",
+	)
+
+	processes := parseSSProcesses(output)
+	if len(processes) != 1 {
+		t.Fatalf("got %d processes, want 1", len(processes))
+	}
+	if processes[0].Port != 3000 || processes[0].PID != 8014 || processes[0].Name != "python3" {
+		t.Fatalf("unexpected process: %+v", processes[0])
 	}
 }

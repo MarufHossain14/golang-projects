@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -17,10 +16,10 @@ var errNotFound = errors.New("no listening process found")
 
 // Process contains the information shown to the user.
 type Process struct {
-	Port    int    `json:"port"`
-	PID     int    `json:"pid"`
-	Name    string `json:"process"`
-	Command string `json:"command"`
+	Port    int
+	PID     int
+	Name    string
+	Command string
 }
 
 // findProcess asks ss for the PID listening on one TCP port.
@@ -46,50 +45,41 @@ func findProcess(port int) (Process, error) {
 	if info.Name == "" {
 		info.Name = found.Name
 	}
+	if info.Name == "" {
+		info.Name = "unknown process"
+	}
 	return info, nil
 }
 
-// listProcesses asks ss for every listening TCP port.
+// listProcesses returns listeners that expose a PID and can therefore be killed.
 func listProcesses() ([]Process, error) {
 	output, err := exec.Command("ss", "-H", "-ltnp").Output()
 	if err != nil {
 		return nil, handleSSError(err)
 	}
-
-	processes := parseSSList(output)
-	commands := make(map[int]string)
-	for i := range processes {
-		command, ok := commands[processes[i].PID]
-		if !ok {
-			command = readCommand(processes[i].PID)
-			commands[processes[i].PID] = command
-		}
-		processes[i].Command = command
-	}
-	return processes, nil
+	return parseSSProcesses(output), nil
 }
 
-// parseSSList converts ss output into Process values.
-func parseSSList(output []byte) []Process {
+func parseSSProcesses(output []byte) []Process {
 	processes := make([]Process, 0)
 	seen := make(map[[2]int]bool)
-	scanner := bufio.NewScanner(bytes.NewReader(output))
-
-	for scanner.Scan() {
-		process, err := parseSSLine(scanner.Text())
-		key := [2]int{process.PID, process.Port}
-		if err != nil || seen[key] {
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		process, err := parseSSLine(line)
+		if err != nil {
 			continue
 		}
-		// The same socket can appear for IPv4 and IPv6, so only keep it once.
+		key := [2]int{process.Port, process.PID}
+		if seen[key] {
+			continue
+		}
 		seen[key] = true
+		if process.Name == "" {
+			process.Name = "unknown process"
+		}
 		processes = append(processes, process)
 	}
 
 	sort.Slice(processes, func(i, j int) bool {
-		if processes[i].Port == processes[j].Port {
-			return processes[i].PID < processes[j].PID
-		}
 		return processes[i].Port < processes[j].Port
 	})
 	return processes
@@ -137,7 +127,11 @@ func portFromAddress(address string) (int, error) {
 	if colon == -1 {
 		return 0, fmt.Errorf("port not found")
 	}
-	return strconv.Atoi(address[colon+1:])
+	port, err := strconv.Atoi(address[colon+1:])
+	if err != nil {
+		return 0, fmt.Errorf("invalid port in address %q", address)
+	}
+	return port, nil
 }
 
 // processInfo reads Linux's /proc folder for the name and full command.
