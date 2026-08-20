@@ -29,6 +29,39 @@ hotkey and see:
 The first version will target Linux with PipeWire and will run entirely on the
 local machine.
 
+## Current development build
+
+The buffering and Linux capture foundation is now implemented. It includes:
+
+- a fixed-size, concurrency-safe PCM ring buffer;
+- independent snapshots while capture continues;
+- memory scrubbing when a capture session stops;
+- a PipeWire `pw-cat` source normalized to 16 kHz mono, 16-bit PCM;
+- WAV encoding for explicit development exports; and
+- race-tested recorder lifecycle and cancellation behavior.
+
+The background daemon, instant playback, voice detection, transcription,
+hotkey, and subtitle overlay are not implemented yet.
+
+Build and inspect the environment:
+
+```bash
+go build -o huh ./cmd/huh
+./huh doctor
+```
+
+The development-only `capture` command proves that real microphone audio can
+flow through the rolling buffer. It requires PipeWire's `pw-cat`. Stop it with
+Ctrl+C to explicitly export the retained audio:
+
+```bash
+./huh capture --duration 30s --output recent.wav
+```
+
+The output path is mandatory, existing files are never overwritten, and the
+result is created with user-only permissions. This export behavior is a testing
+tool; the final listening path will remain memory-only.
+
 ## How it behaves
 
 HUH? starts only when the user explicitly enables listening:
@@ -99,6 +132,12 @@ and should never delay replay.
 ## Planned commands
 
 ```bash
+# Check the development environment.
+huh doctor
+
+# Exercise the current capture pipeline and explicitly export its buffer.
+huh capture --duration 30s --output recent.wav
+
 # Begin maintaining the rolling in-memory buffer.
 huh listen
 
@@ -236,6 +275,8 @@ without obscuring problems in the core pipeline.
 
 ## Project status
 
-This repository currently contains the product concept and implementation plan.
-The first engineering milestone is a minimal Go program that captures audio into
-a circular buffer and replays a snapshot on command.
+The first engineering milestone is in progress. The Go module, rolling buffer,
+recorder lifecycle, PipeWire adapter, WAV encoder, environment diagnostics, and
+development capture command are implemented and tested. The next milestone is a
+long-running local daemon that owns the buffer and accepts `status`, `replay`,
+and `stop` commands from separate CLI invocations.
