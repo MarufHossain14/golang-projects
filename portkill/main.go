@@ -98,7 +98,7 @@ func chooseProcess(processes []Process, input io.Reader, output io.Writer) (Proc
 		fmt.Fprintf(output, "%-4d %-7d %-8d %s\n", i+1, process.Port, process.PID, process.Name)
 	}
 
-	reader := bufio.NewReader(input)
+	reader := bufferedReader(input)
 	for {
 		fmt.Fprintf(output, "\nSelect a process (1-%d, Enter to cancel): ", len(processes))
 		answer, err := reader.ReadString('\n')
@@ -167,7 +167,7 @@ func parseOptions(args []string) (options, error) {
 
 // confirm requires an explicit yes so an accidental Enter cannot kill a process.
 func confirm(input io.Reader, output io.Writer) bool {
-	reader := bufio.NewReader(input)
+	reader := bufferedReader(input)
 	for {
 		fmt.Fprint(output, "\nKill this process? (y/N) ")
 		answer, err := reader.ReadString('\n')
@@ -183,6 +183,14 @@ func confirm(input io.Reader, output io.Writer) bool {
 			fmt.Fprintln(output, "Please answer y or n.")
 		}
 	}
+}
+
+// bufferedReader preserves any input already buffered by a previous prompt.
+func bufferedReader(input io.Reader) *bufio.Reader {
+	if reader, ok := input.(*bufio.Reader); ok {
+		return reader
+	}
+	return bufio.NewReader(input)
 }
 
 func printHelp() {
