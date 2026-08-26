@@ -3,9 +3,27 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestRunAcceptsHelpCommand(t *testing.T) {
+	originalStdout := os.Stdout
+	output, err := os.CreateTemp(t.TempDir(), "portkill-help")
+	if err != nil {
+		t.Fatalf("create temporary output: %v", err)
+	}
+	os.Stdout = output
+	t.Cleanup(func() {
+		os.Stdout = originalStdout
+		output.Close()
+	})
+
+	if exitCode := run([]string{"help"}); exitCode != 0 {
+		t.Fatalf("run(help) exit code = %d, want 0", exitCode)
+	}
+}
 
 func TestParseOptions(t *testing.T) {
 	options, err := parseOptions([]string{"3000", "--force"})

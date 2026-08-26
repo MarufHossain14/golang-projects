@@ -11,6 +11,7 @@ signal a new process that reused the same port.
 
 ```text
 portkill
+portkill help
 portkill list
 portkill <port> [--force]
 ```

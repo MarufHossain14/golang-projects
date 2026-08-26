@@ -41,7 +41,7 @@ func run(args []string) int {
 	if len(args) == 1 && args[0] == "list" {
 		return showProcesses()
 	}
-	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
+	if len(args) == 1 && (args[0] == "help" || args[0] == "-h" || args[0] == "--help") {
 		printHelp()
 		return 0
 	}
@@ -198,6 +198,7 @@ func printHelp() {
 
 Usage:
   portkill
+  portkill help
   portkill list
   portkill <port> [--force]
 
